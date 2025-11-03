@@ -1,0 +1,14 @@
+# IDE
+.project
+.pydevproject
+.settings/
+.spyderproject
+.spyproject
+.vscode/
+.idea/
+
+# Terraform
+.terraform.lock.hcl
+.terraform/
+*.tfvars
+terraform.tfstate*
