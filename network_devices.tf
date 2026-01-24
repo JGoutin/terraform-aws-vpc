@@ -196,7 +196,7 @@ resource "aws_security_group" "netdev_vpce" {
 # Network devices : Internet Gateways
 
 resource "aws_internet_gateway" "netdev" {
-  count  = local.vpc_enabled && local.internet_required ? 1 : 0
+  count  = local.vpc_enabled && (local.internet_required || local.public_subnets_enabled) ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
   tags   = { Name = "${var.name_prefix}-igw-${local.region}" }
 }
