@@ -1,5 +1,8 @@
 # AWS VPC Infrastructure Module
 
+[![Terraform Module](https://img.shields.io/badge/Terraform-VPC%20module-844FBA?logo=terraform&logoColor=ffffff)](https://registry.terraform.io/modules/jgoutin/vpc/aws/latest)
+[![OpenTofu Module](https://img.shields.io/badge/OpenTofu-VPC%20module-FFDA18?logo=opentofu&logoColor=ffffff)](https://search.opentofu.org/module/jgoutin/vpc/aws/latest)
+
 Reusable Terraform module for creating secure, production-ready VPC infrastructure with multi-AZ subnets, NAT gateways, VPC endpoints, and monitoring.
 
 ## Overview
