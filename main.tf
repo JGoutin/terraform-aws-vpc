@@ -3,7 +3,7 @@ Network configuration
 */
 
 locals {
-  region             = data.aws_region.current.name
+  region             = data.aws_region.current.region
   vpc_enabled        = length(var.subnets_ids) == 0
   vpc_resource_count = local.vpc_enabled ? 1 : 0
 

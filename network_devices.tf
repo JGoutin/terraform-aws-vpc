@@ -140,7 +140,7 @@ resource "aws_network_acl_rule" "netdev_ipv6_egress" {
 resource "aws_vpc_endpoint" "netdev_vpce_gateway" {
   for_each          = local.vpc_enabled ? local.vpce_gateway_services : []
   vpc_id            = aws_vpc.vpc[0].id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.${each.key}"
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.${each.key}"
   vpc_endpoint_type = "Gateway"
   tags              = merge(local.tags, { Name = "${var.name_prefix}-vpce-${each.key}-${local.region}" })
 }
@@ -160,7 +160,7 @@ resource "aws_vpc_endpoint_route_table_association" "netdev_app_to_vpce" {
 resource "aws_vpc_endpoint" "netdev_vpce_interface" {
   for_each            = local.vpc_enabled ? data.aws_vpc_endpoint_service.netdev_vpce_interface : {}
   vpc_id              = aws_vpc.vpc[0].id
-  service_name        = "com.amazonaws.${data.aws_region.current.name}.${each.key}"
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.${each.key}"
   vpc_endpoint_type   = "Interface"
   ip_address_type     = contains(each.value.supported_ip_address_types, "ipv6") ? "dualstack" : "ipv4"
   subnet_ids          = [for az in local.vpc_availability_zones : aws_subnet.netdev[az].id]
