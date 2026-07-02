@@ -179,7 +179,11 @@ data "aws_vpc_endpoint_service" "netdev_vpce_interface" {
 }
 
 resource "aws_security_group" "netdev_vpce" {
-  count       = local.vpce_interfaces_enabled && local.vpc_enabled ? 1 : 0
+  # Tied to the netdev subnet's existence, not to whether an interface endpoint is currently requested: once
+  # created, later disabling every interface endpoint (guardduty/compliance/opportunistic) must not destroy
+  # this security group, since aws_security_group.app's egress rule still references it by id, and deleting
+  # a security group that's referenced by another one's rule fails with DependencyViolation.
+  count       = local.vpce_netdev_available ? 1 : 0
   name        = "${var.name_prefix}-vpce-sg-${local.region}"
   description = "Security group for VPC endpoints"
   vpc_id      = aws_vpc.vpc[0].id

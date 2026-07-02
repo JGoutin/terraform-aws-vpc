@@ -11,6 +11,13 @@ resource "aws_vpc" "vpc" {
   tags                             = merge(local.tags, { Name = "${var.name_prefix}-vpc-${local.region}" })
 }
 
+# No ingress/egress blocks: revokes all default rules (Security Hub EC2.2 / CIS 5.4).
+resource "aws_default_security_group" "vpc" {
+  count  = local.vpc_resource_count
+  vpc_id = aws_vpc.vpc[0].id
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-default-sg-${local.region}" })
+}
+
 resource "aws_vpc_dhcp_options" "vpc" {
   count               = local.vpc_resource_count
   domain_name_servers = ["AmazonProvidedDNS"]

@@ -97,15 +97,17 @@ locals {
   ] : []
 
   # NACL rules
+  # netdev and internet access are independent, not exclusive: both rules are added whenever needed.
   app_nacl_rules_ipv4_ingress = concat(
     local.app_nacl_rules_intra_ipv4,
     local.vpce_interfaces_enabled ? [
       # Allow responses from devices subnets
       { cidr_block = module.vpc_ipv4_cidr[0].network_cidr_blocks["netdev"], from_port = 1024, to_port = 65535, protocol = "tcp" },
-      ] : [
+    ] : [],
+    local.internet_required ? [
       # Allow responses from internet
       { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
-    ],
+    ] : [],
     local.app_nacl_rules_from_public_ipv4
   )
   app_nacl_rules_ipv4_egress = concat(
@@ -113,26 +115,35 @@ locals {
     local.vpce_interfaces_enabled ? [
       # Allow requests to devices subnets
       { cidr_block = module.vpc_ipv4_cidr[0].network_cidr_blocks["netdev"], from_port = 443, to_port = 443, protocol = "tcp" },
-      ] : [
+    ] : [],
+    local.internet_required ? [
       # Allow requests to internet
       { cidr_block = "0.0.0.0/0", from_port = 443, to_port = 443, protocol = "tcp" }
-    ],
+    ] : [],
     local.app_nacl_rules_to_public_ipv4
   )
   app_nacl_rules_ipv6_ingress = concat(
     local.app_nacl_rules_intra_ipv6,
-    [
-      # Allow responses from devices subnets or internet in case of NAT Gateway
-      { cidr_block = local.vpce_interfaces_enabled ? module.vpc_ipv6_cidr[0].network_cidr_blocks["netdev"] : "::/0", from_port = 1024, to_port = 65535, protocol = "tcp" },
-    ],
+    local.vpce_interfaces_enabled ? [
+      # Allow responses from devices subnets
+      { cidr_block = module.vpc_ipv6_cidr[0].network_cidr_blocks["netdev"], from_port = 1024, to_port = 65535, protocol = "tcp" },
+    ] : [],
+    local.internet_required ? [
+      # Allow responses from internet (direct or via NAT Gateway)
+      { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = "tcp" },
+    ] : [],
     local.app_nacl_rules_from_public_ipv6
   )
   app_nacl_rules_ipv6_egress = concat(
     local.app_nacl_rules_intra_ipv6,
-    [
-      # Allow requests to devices subnets or internet in case of NAT Gateway
-      { cidr_block = local.vpce_interfaces_enabled ? module.vpc_ipv6_cidr[0].network_cidr_blocks["netdev"] : "::/0", from_port = 443, to_port = 443, protocol = "tcp" },
-    ],
+    local.vpce_interfaces_enabled ? [
+      # Allow requests to devices subnets
+      { cidr_block = module.vpc_ipv6_cidr[0].network_cidr_blocks["netdev"], from_port = 443, to_port = 443, protocol = "tcp" },
+    ] : [],
+    local.internet_required ? [
+      # Allow requests to internet (direct or via NAT Gateway)
+      { cidr_block = "::/0", from_port = 443, to_port = 443, protocol = "tcp" },
+    ] : [],
     local.app_nacl_rules_to_public_ipv6
   )
 }

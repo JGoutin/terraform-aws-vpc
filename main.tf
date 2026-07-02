@@ -19,15 +19,49 @@ locals {
 
   # AWS services requirements
   vpce_gateway_services_all = ["s3", "dynamodb"]
-  vpce_gateway_services     = setintersection(var.vpc_endpoints_services, local.vpce_gateway_services_all)
-  vpce_interfaces_services  = setsubtract(var.vpc_endpoints_services, local.vpce_gateway_services_all)
-  vpce_interfaces_required  = length(local.vpce_interfaces_services) > 0
+  # Interface endpoints required to pass Security Hub EC2.55 (ECR API), EC2.56 (ECR DKR), EC2.57 (SSM),
+  # EC2.58 (SSM Incident Manager Contacts) and EC2.60 (SSM Incident Manager).
+  vpce_compliance_services = var.compliance_vpc_endpoints_enabled ? ["ecr.api", "ecr.dkr", "ssm", "ssm-contacts", "ssm-incidents"] : []
+  # Interface endpoint required by GuardDuty Runtime Monitoring when the security agent is installed manually.
+  # Also created when using GuardDuty's automated agent configuration: that mechanism creates its own endpoint
+  # but doesn't guarantee placement in this module's netdev subnets and can fail, so managing it here whenever
+  # requested takes priority over leaving it to GuardDuty.
+  vpce_guardduty_services = var.guardduty_vpc_endpoint_enabled ? ["guardduty-data"] : []
+  # Enforced endpoints: created whenever a netdev (private) subnet exists (see vpce_enforced_enabled below),
+  # regardless of var.internet_access_allowed/var.nat_gateways_allowed.
+  vpce_enforced_services = concat(local.vpce_compliance_services, local.vpce_guardduty_services)
+
+  # Non-enforced (caller-supplied only) interface endpoints: only created when there is no direct internet
+  # route, same cost-driven behavior as before var.compliance_vpc_endpoints_enabled/var.guardduty_vpc_endpoint_enabled existed.
+  vpce_gateway_services                  = setintersection(var.vpc_endpoints_services, local.vpce_gateway_services_all)
+  vpce_interfaces_services_opportunistic = setsubtract(var.vpc_endpoints_services, local.vpce_gateway_services_all)
+  vpce_interfaces_required               = length(local.vpce_interfaces_services_opportunistic) > 0
 
   # Network egress access
-  internet_required       = var.internet_access_allowed || (local.vpce_interfaces_required && !var.vpc_endpoints_allowed)
-  vpce_interfaces_enabled = local.vpce_interfaces_required && var.vpc_endpoints_allowed && !local.internet_required && local.vpc_enabled
-  nat_gateways_enabled    = local.internet_required && var.nat_gateways_allowed && local.vpc_enabled
-  public_subnet_enabled   = local.internet_required && !var.nat_gateways_allowed && local.vpc_enabled
+  internet_required     = var.internet_access_allowed || (local.vpce_interfaces_required && !var.vpc_endpoints_allowed)
+  nat_gateways_enabled  = local.internet_required && var.nat_gateways_allowed && local.vpc_enabled
+  public_subnet_enabled = local.internet_required && !var.nat_gateways_allowed && local.vpc_enabled
+
+  # The netdev (private) subnets exist whenever the app tier isn't directly public.
+  vpce_netdev_available = local.vpc_enabled && !local.public_subnet_enabled
+
+  # Opportunistic endpoints: created only when there's no direct internet route (existing cost-driven behavior).
+  vpce_opportunistic_enabled = local.vpce_interfaces_required && var.vpc_endpoints_allowed && !local.internet_required && local.vpce_netdev_available
+
+  # Enforced endpoints (compliance + GuardDuty): created whenever physically possible (a netdev subnet
+  # exists), regardless of var.internet_access_allowed / var.nat_gateways_allowed. Still impossible in the
+  # public-subnet (var.internet_access_allowed=true, var.nat_gateways_allowed=false) architecture, since no
+  # private subnet exists there to host the endpoint's ENI.
+  vpce_enforced_enabled = var.vpc_endpoints_allowed && local.vpce_netdev_available && length(local.vpce_enforced_services) > 0
+
+  # True if any interface endpoint (opportunistic or enforced) will be created — used to gate the netdev
+  # security group, NACL rules and app-tier route needed to reach it.
+  vpce_interfaces_enabled = local.vpce_opportunistic_enabled || local.vpce_enforced_enabled
+
+  vpce_interfaces_services = distinct(concat(
+    local.vpce_opportunistic_enabled ? tolist(local.vpce_interfaces_services_opportunistic) : [],
+    local.vpce_enforced_enabled ? local.vpce_enforced_services : [],
+  ))
 }
 
 data "aws_availability_zones" "available" {
