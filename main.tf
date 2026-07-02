@@ -6,6 +6,9 @@ locals {
   region             = data.aws_region.current.name
   vpc_enabled        = length(var.subnets_ids) == 0
   vpc_resource_count = local.vpc_enabled ? 1 : 0
+
+  # Tags to merge into resources that already carry a Name tag
+  tags = coalesce(var.tags, {})
   vpc_availability_zones = toset(
     local.vpc_enabled ? (
       var.availability_zones_count != null ?
@@ -43,10 +46,11 @@ KMS key
 
 module "kms_key" {
   source  = "JGoutin/kms-key/aws"
-  version = "~> 1.0"
+  version = "~> 1.2"
 
   id                = var.kms_key_id
   name_prefix       = var.name_prefix
+  tags              = local.tags
   policy_dependency = var.kms_policy_dependency
   policy_documents_json = local.vpc_flow_log_enabled ? [
     data.aws_iam_policy_document.vpc_flow_log_kms_policy[0].json,

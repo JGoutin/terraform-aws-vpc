@@ -25,7 +25,7 @@ resource "aws_security_group" "app" {
     prefix_list_ids  = local.vpce_interfaces_enabled ? [for gateway in values(aws_vpc_endpoint.netdev_vpce_gateway) : gateway.prefix_list_id] : null
     security_groups  = local.vpce_interfaces_enabled ? [aws_security_group.netdev_vpce[0].id] : null
   }
-  tags = { Name = "${var.name_prefix}-app-sg-${local.region}" }
+  tags = merge(local.tags, { Name = "${var.name_prefix}-app-sg-${local.region}" })
 }
 
 # Subnets
@@ -165,13 +165,13 @@ resource "aws_subnet" "app" {
   ipv6_cidr_block                 = module.app_ipv6_cidr[0].network_cidr_blocks[each.key]
   assign_ipv6_address_on_creation = true
   map_public_ip_on_launch         = local.public_subnet_enabled
-  tags                            = { Name = "${var.name_prefix}-app-sn-${each.key}" }
+  tags                            = merge(local.tags, { Name = "${var.name_prefix}-app-sn-${each.key}" })
 }
 
 resource "aws_route_table" "app" {
   for_each = local.vpc_availability_zones
   vpc_id   = aws_vpc.vpc[0].id
-  tags     = { Name = "${var.name_prefix}-app-rt-${each.key}" }
+  tags     = merge(local.tags, { Name = "${var.name_prefix}-app-rt-${each.key}" })
 }
 
 resource "aws_route_table_association" "app" {
@@ -183,7 +183,7 @@ resource "aws_route_table_association" "app" {
 resource "aws_network_acl" "app" {
   count  = local.vpc_enabled ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-app-nacl-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-app-nacl-${local.region}" })
 }
 
 resource "aws_network_acl_association" "app" {

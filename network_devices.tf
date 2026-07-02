@@ -60,13 +60,13 @@ resource "aws_subnet" "netdev" {
   ipv6_cidr_block                 = module.netdev_ipv6_cidr[0].network_cidr_blocks[each.key]
   assign_ipv6_address_on_creation = true
   map_public_ip_on_launch         = false
-  tags                            = { Name = "${var.name_prefix}-netdev-sn-${each.key}" }
+  tags                            = merge(local.tags, { Name = "${var.name_prefix}-netdev-sn-${each.key}" })
 }
 
 resource "aws_route_table" "netdev" {
   count  = local.vpc_enabled && !local.public_subnet_enabled ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-netdev-rt-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-netdev-rt-${local.region}" })
 }
 
 resource "aws_route_table_association" "netdev" {
@@ -78,7 +78,7 @@ resource "aws_route_table_association" "netdev" {
 resource "aws_network_acl" "netdev" {
   count  = local.vpc_enabled && !local.public_subnet_enabled ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-netdev-nacl-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-netdev-nacl-${local.region}" })
 }
 
 resource "aws_network_acl_association" "netdev" {
@@ -142,7 +142,7 @@ resource "aws_vpc_endpoint" "netdev_vpce_gateway" {
   vpc_id            = aws_vpc.vpc[0].id
   service_name      = "com.amazonaws.${data.aws_region.current.name}.${each.key}"
   vpc_endpoint_type = "Gateway"
-  tags              = { Name = "${var.name_prefix}-vpce-${each.key}-${local.region}" }
+  tags              = merge(local.tags, { Name = "${var.name_prefix}-vpce-${each.key}-${local.region}" })
 }
 
 resource "aws_vpc_endpoint_route_table_association" "netdev_app_to_vpce" {
@@ -166,7 +166,7 @@ resource "aws_vpc_endpoint" "netdev_vpce_interface" {
   subnet_ids          = [for az in local.vpc_availability_zones : aws_subnet.netdev[az].id]
   security_group_ids  = [aws_security_group.netdev_vpce[0].id]
   private_dns_enabled = true
-  tags                = { Name = "${var.name_prefix}-vpce-${each.key}-${local.region}" }
+  tags                = merge(local.tags, { Name = "${var.name_prefix}-vpce-${each.key}-${local.region}" })
   dns_options {
     dns_record_ip_type = contains(each.value.supported_ip_address_types, "ipv6") ? "dualstack" : "ipv4"
   }
@@ -190,7 +190,7 @@ resource "aws_security_group" "netdev_vpce" {
     cidr_blocks      = [module.vpc_ipv4_cidr[0].network_cidr_blocks["app"]]
     ipv6_cidr_blocks = [module.vpc_ipv6_cidr[0].network_cidr_blocks["app"]]
   }
-  tags = { Name = "${var.name_prefix}-vpce-sg-${local.region}" }
+  tags = merge(local.tags, { Name = "${var.name_prefix}-vpce-sg-${local.region}" })
 }
 
 # Network devices : Internet Gateways
@@ -198,13 +198,13 @@ resource "aws_security_group" "netdev_vpce" {
 resource "aws_internet_gateway" "netdev" {
   count  = local.vpc_enabled && (local.internet_required || local.public_subnets_enabled) ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-igw-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-igw-${local.region}" })
 }
 
 resource "aws_egress_only_internet_gateway" "netdev" {
   count  = local.vpc_enabled && local.internet_required ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-eigw-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-eigw-${local.region}" })
 }
 
 resource "aws_route" "netdev_app_to_web_ipv6" {
@@ -227,7 +227,7 @@ resource "aws_nat_gateway" "netdev_nat" {
   for_each      = toset(local.vpc_enabled && local.nat_gateways_enabled ? local.vpc_availability_zones : [])
   allocation_id = aws_eip.netdev_nat[each.key].id
   subnet_id     = aws_subnet.netdev[each.key].id
-  tags          = { Name = "${var.name_prefix}-natgw-${each.key}" }
+  tags          = merge(local.tags, { Name = "${var.name_prefix}-natgw-${each.key}" })
   lifecycle {
     create_before_destroy = true
   }
@@ -235,7 +235,7 @@ resource "aws_nat_gateway" "netdev_nat" {
 
 resource "aws_eip" "netdev_nat" {
   for_each = toset(local.vpc_enabled && local.nat_gateways_enabled ? local.vpc_availability_zones : [])
-  tags     = { Name = "${var.name_prefix}-natgw-eip-${each.key}" }
+  tags     = merge(local.tags, { Name = "${var.name_prefix}-natgw-eip-${each.key}" })
   lifecycle {
     create_before_destroy = true
   }

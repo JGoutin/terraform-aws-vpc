@@ -177,13 +177,13 @@ resource "aws_subnet" "public" {
   ipv6_cidr_block                 = module.public_ipv6_cidr[0].network_cidr_blocks[each.key]
   assign_ipv6_address_on_creation = true
   map_public_ip_on_launch         = true
-  tags                            = { Name = "${var.name_prefix}-public-sn-${each.key}" }
+  tags                            = merge(local.tags, { Name = "${var.name_prefix}-public-sn-${each.key}" })
 }
 
 resource "aws_route_table" "public" {
   count  = local.public_subnets_enabled ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-public-rt-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-public-rt-${local.region}" })
 }
 
 resource "aws_route_table_association" "public" {
@@ -213,7 +213,7 @@ resource "aws_route" "public_to_internet_ipv6" {
 resource "aws_network_acl" "public" {
   count  = local.public_subnets_enabled ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
-  tags   = { Name = "${var.name_prefix}-public-nacl-${local.region}" }
+  tags   = merge(local.tags, { Name = "${var.name_prefix}-public-nacl-${local.region}" })
 }
 
 resource "aws_network_acl_association" "public" {

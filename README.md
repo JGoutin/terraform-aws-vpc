@@ -278,7 +278,7 @@ Key outputs for resource integration:
 ## Requirements
 
 - **Terraform/OpenTofu**: >= 1.5.0
-- **AWS Provider**: >= 5.0
+- **AWS Provider**: >= 6.27.0
 - **AWS Region**: Any region with VPC support
 
 ## Best Practices
@@ -298,23 +298,23 @@ Key outputs for resource integration:
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >=1 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >=5 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 6.27.0 |
 
 ## Providers
 
 | Name | Version |
-|------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >=5 |
+| ---- | ------- |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 6.27.0 |
 
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_app_ipv4_cidr"></a> [app\_ipv4\_cidr](#module\_app\_ipv4\_cidr) | hashicorp/subnets/cidr | n/a |
 | <a name="module_app_ipv6_cidr"></a> [app\_ipv6\_cidr](#module\_app\_ipv6\_cidr) | hashicorp/subnets/cidr | n/a |
-| <a name="module_kms_key"></a> [kms\_key](#module\_kms\_key) | ../module-kms-key | n/a |
+| <a name="module_kms_key"></a> [kms\_key](#module\_kms\_key) | JGoutin/kms-key/aws | ~> 1.2 |
 | <a name="module_netdev_ipv4_cidr"></a> [netdev\_ipv4\_cidr](#module\_netdev\_ipv4\_cidr) | hashicorp/subnets/cidr | n/a |
 | <a name="module_netdev_ipv6_cidr"></a> [netdev\_ipv6\_cidr](#module\_netdev\_ipv6\_cidr) | hashicorp/subnets/cidr | n/a |
 | <a name="module_public_ipv4_cidr"></a> [public\_ipv4\_cidr](#module\_public\_ipv4\_cidr) | hashicorp/subnets/cidr | n/a |
@@ -325,7 +325,7 @@ Key outputs for resource integration:
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [aws_cloudwatch_log_group.vpc_flow_log](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
 | [aws_egress_only_internet_gateway.netdev](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/egress_only_internet_gateway) | resource |
 | [aws_eip.netdev_nat](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip) | resource |
@@ -387,7 +387,7 @@ Key outputs for resource integration:
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_availability_zones_count"></a> [availability\_zones\_count](#input\_availability\_zones\_count) | Maximum count of availability zones to provision with the dedicated VPC. Default to all available availability zones. | `number` | `null` | no |
 | <a name="input_internet_access_allowed"></a> [internet\_access\_allowed](#input\_internet\_access\_allowed) | If true, allow internet access. | `bool` | `false` | no |
 | <a name="input_kms_key_id"></a> [kms\_key\_id](#input\_kms\_key\_id) | If specified, directly use this KMS key instead of creating a dedicated one for the application. | `string` | `null` | no |
@@ -399,6 +399,7 @@ Key outputs for resource integration:
 | <a name="input_public_to_app_ports"></a> [public\_to\_app\_ports](#input\_public\_to\_app\_ports) | Map of ports for public subnet to app server communication. Each entry must specify from\_port. Optional: to\_port (defaults to from\_port), protocol (defaults to 'tcp'). | <pre>map(object({<br/>    from_port = number<br/>    to_port   = optional(number)<br/>    protocol  = optional(string, "tcp")<br/>  }))</pre> | <pre>{<br/>  "http": {<br/>    "from_port": 8000<br/>  }<br/>}</pre> | no |
 | <a name="input_security_group_id"></a> [security\_group\_id](#input\_security\_group\_id) | If specified and 'subnet\_ids' is specified, use this security group instead of creating a new one giving access to internet and AWS services. | `string` | `null` | no |
 | <a name="input_subnets_ids"></a> [subnets\_ids](#input\_subnets\_ids) | If specified, directly use theses subnets instead of creating a dedicated VPC. | `list(string)` | `[]` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | Additional tags to apply to created resources. | `map(string)` | `null` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR block for the dedicated VPC. | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_endpoints_allowed"></a> [vpc\_endpoints\_allowed](#input\_vpc\_endpoints\_allowed) | If true, VPC endpoints interfaces are privileged to give AWS services access to the application if no internet access is required. VPC endpoint Gateway are always provisioned. Disable only if cost is privileged over security. | `bool` | `true` | no |
 | <a name="input_vpc_endpoints_services"></a> [vpc\_endpoints\_services](#input\_vpc\_endpoints\_services) | List of AWS services endpoints to give access to the application. | `list(string)` | `[]` | no |
@@ -408,7 +409,7 @@ Key outputs for resource integration:
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_ipv6_enabled"></a> [ipv6\_enabled](#output\_ipv6\_enabled) | Whether IPv6 is enabled on the VPC. |
 | <a name="output_kms_key_arn"></a> [kms\_key\_arn](#output\_kms\_key\_arn) | KMS key ARN. |
 | <a name="output_kms_key_id"></a> [kms\_key\_id](#output\_kms\_key\_id) | KMS key ID. |
@@ -418,3 +419,4 @@ Key outputs for resource integration:
 | <a name="output_security_group_id"></a> [security\_group\_id](#output\_security\_group\_id) | Security groups ID. |
 | <a name="output_subnets_ids"></a> [subnets\_ids](#output\_subnets\_ids) | Subnets ID. |
 | <a name="output_vpc_id"></a> [vpc\_id](#output\_vpc\_id) | VPC ID. |
+<!-- END_TF_DOCS -->

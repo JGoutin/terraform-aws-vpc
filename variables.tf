@@ -113,3 +113,9 @@ variable "public_ingress_ports" {
     }
   }
 }
+
+variable "tags" {
+  description = "Additional tags to apply to created resources."
+  type        = map(string)
+  default     = null
+}

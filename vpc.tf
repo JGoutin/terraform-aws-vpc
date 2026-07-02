@@ -8,14 +8,14 @@ resource "aws_vpc" "vpc" {
   enable_dns_support               = true
   enable_dns_hostnames             = true
   assign_generated_ipv6_cidr_block = true
-  tags                             = { Name = "${var.name_prefix}-vpc-${local.region}" }
+  tags                             = merge(local.tags, { Name = "${var.name_prefix}-vpc-${local.region}" })
 }
 
 resource "aws_vpc_dhcp_options" "vpc" {
   count               = local.vpc_resource_count
   domain_name_servers = ["AmazonProvidedDNS"]
   ntp_servers         = ["169.254.169.123", "fd00:ec2::123"] # AWS NTP server (IPv4 and IPv6)
-  tags                = { Name = "${var.name_prefix}-dhcpo-${local.region}" }
+  tags                = merge(local.tags, { Name = "${var.name_prefix}-dhcpo-${local.region}" })
 }
 
 resource "aws_vpc_dhcp_options_association" "vpc" {
@@ -78,6 +78,7 @@ resource "aws_flow_log" "vpc" {
   iam_role_arn    = aws_iam_role.vpc_flow_log[0].arn
   vpc_id          = aws_vpc.vpc[0].id
   traffic_type    = "ALL"
+  tags            = var.tags
 }
 
 resource "aws_cloudwatch_log_group" "vpc_flow_log" {
@@ -86,12 +87,14 @@ resource "aws_cloudwatch_log_group" "vpc_flow_log" {
   retention_in_days = var.vpc_flow_log_retention_days
   kms_key_id        = module.kms_key.arn
   depends_on        = [module.kms_key.policy_dependency]
+  tags              = var.tags
 }
 
 resource "aws_iam_role" "vpc_flow_log" {
   count              = local.vpc_flow_log_resource_count
   name               = local.vpc_flow_log_name
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_log_assume[0].json
+  tags               = var.tags
 }
 
 resource "aws_iam_role_policy" "vpc_flow_log" {
