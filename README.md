@@ -23,7 +23,7 @@ This module provides a complete AWS VPC networking solution designed for secure,
 - ✅ **Multi-AZ Deployment** - High availability across availability zones
 - ✅ **Public/Private Subnets** - Secure architecture
 - ✅ **NAT Gateways** - Private subnet internet access
-- ✅ **IPv6 Support** - Optional dual-stack networking
+- ✅ **IPv6 Support** - Dual-stack networking, always enabled
 
 ### VPC Endpoints
 - ✅ **Gateway Endpoints** - S3, DynamoDB (no cost)
@@ -50,12 +50,12 @@ This module provides a complete AWS VPC networking solution designed for secure,
 module "vpc" {
   source = "JGoutin/vpc/aws"
   
-  name = "my-vpc"
-  cidr = "10.0.0.0/16"
+  name_prefix = "my-vpc"
+  vpc_cidr    = "10.0.0.0/16"
 }
 ```
 
-Creates VPC with default settings: 2 public + 2 private subnets, NAT gateways, VPC endpoints.
+Creates a VPC with default settings: private app subnets (one per AZ), NAT gateways, VPC endpoints, flow logs.
 
 ### Production Example
 
@@ -63,25 +63,19 @@ Creates VPC with default settings: 2 public + 2 private subnets, NAT gateways, V
 module "vpc" {
   source = "JGoutin/vpc/aws"
   
-  name                     = "production-vpc"
-  cidr                     = "10.0.0.0/16"
+  name_prefix              = "production-vpc"
+  vpc_cidr                 = "10.0.0.0/16"
   availability_zones_count = 3
   
-  # Subnets
-  subnet_public_count  = 3
-  subnet_private_count = 3
-  
   # Networking
-  enable_nat_gateway = true
-  enable_ipv6        = false
+  nat_gateways_allowed = true
   
   # VPC Endpoints
   vpc_endpoints_allowed = true
   
   # Monitoring
-  enable_flow_log               = true
-  flow_log_retention_in_days    = 90
-  flow_log_max_aggregation_interval = 60
+  vpc_flow_log_enabled        = true
+  vpc_flow_log_retention_days = 365
   
   tags = {
     Environment = "production"
@@ -96,17 +90,17 @@ module "vpc" {
 module "vpc" {
   source = "JGoutin/vpc/aws"
   
-  name = "cost-optimized-vpc"
-  cidr = "10.0.0.0/16"
+  name_prefix = "cost-optimized-vpc"
+  vpc_cidr    = "10.0.0.0/16"
   
   # Use public subnets instead of NAT gateways
-  enable_nat_gateway = false
+  nat_gateways_allowed = false
   
   # Disable interface endpoints (keep gateway endpoints)
   vpc_endpoints_allowed = false
   
   # Disable flow logs
-  enable_flow_log = false
+  vpc_flow_log_enabled = false
 }
 ```
 
@@ -151,9 +145,9 @@ Saves ~$35-45/month by eliminating NAT Gateway and VPC endpoints.
 
 ## Subnet Distribution
 
-Module automatically calculates CIDR blocks:
+Module automatically calculates CIDR blocks, one subnet per availability zone (`availability_zones_count`):
 
-**Example: 10.0.0.0/16 with 2 public + 2 private subnets:**
+**Example: 10.0.0.0/16 with 2 AZs (2 public + 2 private subnets):**
 - Public Subnet A: 10.0.0.0/24 (10.0.0.1 - 10.0.0.254)
 - Public Subnet B: 10.0.1.0/24 (10.0.1.1 - 10.0.1.254)
 - Private Subnet A: 10.0.2.0/24 (10.0.2.1 - 10.0.2.254)
@@ -196,7 +190,7 @@ Requires `vpc_endpoints_allowed = true` (default) and the service listed in `vpc
 ### NAT Gateway (Secure)
 
 ```hcl
-enable_nat_gateway = true
+nat_gateways_allowed = true
 ```
 
 **Pros:**
@@ -211,7 +205,7 @@ enable_nat_gateway = true
 ### Public Subnets (Cost-Optimized)
 
 ```hcl
-enable_nat_gateway = false
+nat_gateways_allowed = false
 ```
 
 **Pros:**
@@ -229,9 +223,8 @@ enable_nat_gateway = false
 Network traffic monitoring for security and compliance:
 
 ```hcl
-enable_flow_log               = true
-flow_log_retention_in_days    = 90
-flow_log_max_aggregation_interval = 60  # seconds
+vpc_flow_log_enabled        = true
+vpc_flow_log_retention_days = 365
 ```
 
 **Use cases:**
@@ -244,16 +237,10 @@ flow_log_max_aggregation_interval = 60  # seconds
 
 ## IPv6 Support
 
-Enable dual-stack networking:
-
-```hcl
-enable_ipv6 = true
-```
-
-Automatically assigns:
+Dual-stack networking is always enabled — no variable needed. The module automatically assigns:
 - VPC IPv6 CIDR block (/56)
 - Subnet IPv6 CIDR blocks (/64)
-- IGW egress-only gateway
+- Egress-only internet gateway
 - Route table entries
 
 ## Use Cases
@@ -265,21 +252,8 @@ Automatically assigns:
 - **Hybrid Cloud** - VPN/Direct Connect integration
 - **Multi-Region** - Consistent VPC architecture
 
-## Outputs
-
-Key outputs for resource integration:
-
-- `vpc_id` - For security groups, resources
-- `public_subnet_ids` - For ALB, NAT
-- `private_subnet_ids` - For ECS, RDS, Lambda
-- `vpc_endpoints` - Endpoint IDs
-- `nat_gateway_public_ips` - For firewall rules
-- `availability_zones` - AZ list
-
 ## Requirements
 
-- **Terraform/OpenTofu**: >= 1.5.0
-- **AWS Provider**: >= 6.27.0
 - **AWS Region**: Any region with VPC support
 
 ## Best Practices
