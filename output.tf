@@ -42,3 +42,8 @@ output "public_subnets_ids" {
   description = "Public subnets IDs. Empty list if public subnets are not enabled."
   value       = local.public_subnets_enabled ? [for az in local.vpc_availability_zones : aws_subnet.public[az].id] : []
 }
+
+output "dns_firewall_rule_group_id" {
+  description = "Route 53 Resolver DNS Firewall rule group ID. Null if var.dns_firewall_enabled is false."
+  value       = local.dns_firewall_enabled ? aws_route53_resolver_firewall_rule_group.dns_firewall[0].id : null
+}

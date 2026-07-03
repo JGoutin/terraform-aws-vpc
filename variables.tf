@@ -126,6 +126,54 @@ variable "public_ingress_ports" {
   }
 }
 
+variable "dns_firewall_enabled" {
+  description = "If true, create a Route 53 Resolver DNS Firewall rule group and associate it with this module's dedicated VPC, blocking/alerting on DNS queries per var.dns_firewall_managed_domain_lists and var.dns_firewall_advanced_enabled. Only supported for the VPC this module creates; cannot be enabled when using external subnets (subnets_ids). Not mapped to a Security Hub control; default false = feature not created."
+  type        = bool
+  default     = false
+  validation {
+    condition     = !var.dns_firewall_enabled || length(var.subnets_ids) == 0
+    error_message = "dns_firewall_enabled cannot be enabled when using external subnets (subnets_ids). DNS Firewall is only supported for the dedicated VPC managed by this module."
+  }
+}
+
+variable "dns_firewall_managed_domain_list_ids" {
+  description = "Map of AWS Managed Domain List name to ID (e.g. { \"AWSManagedDomainsAggregateThreatList\" = \"rslvr-fdl-...\" }) to block/alert on via var.dns_firewall_action. Defaults (null) to this module's built-in Aggregate Threat List ID for the current region (see local.dns_firewall_default_managed_domain_list_ids in dns_firewall.tf), covering commercial regions enabled by default. IDs are region-specific and can't be resolved from within Terraform, so for a region not in that table look yours up with: 'aws route53resolver list-firewall-domain-lists --query \"FirewallDomainLists[?ManagedOwnerName=='Route 53 Resolver DNS Firewall']\"'. Ignored if var.dns_firewall_enabled is false. Set to {} to skip managed-list rules while still using var.dns_firewall_advanced_enabled."
+  type        = map(string)
+  default     = null
+}
+
+variable "dns_firewall_action" {
+  description = "Action taken by DNS Firewall when a query matches a domain from var.dns_firewall_managed_domain_list_ids, and (if var.dns_firewall_advanced_enabled) a DNS Firewall Advanced threat detection. Valid values: 'ALLOW', 'BLOCK', 'ALERT'. 'ALLOW' isn't valid for DNS Firewall Advanced rules, so it's treated as 'BLOCK' for those only. Ignored if var.dns_firewall_enabled is false."
+  type        = string
+  default     = "BLOCK"
+  validation {
+    condition     = contains(["ALLOW", "BLOCK", "ALERT"], var.dns_firewall_action)
+    error_message = "dns_firewall_action must be one of: ALLOW, BLOCK, ALERT."
+  }
+}
+
+variable "dns_firewall_advanced_enabled" {
+  description = "If true, add Route 53 Resolver DNS Firewall Advanced rules blocking DNS queries identified as domain generation algorithm (DGA) or DNS tunneling activity, on top of any managed-domain-list rules. Ignored if var.dns_firewall_enabled is false."
+  type        = bool
+  default     = false
+}
+
+variable "dns_firewall_advanced_confidence_threshold" {
+  description = "Confidence threshold for DNS Firewall Advanced rules. Valid values: 'LOW', 'MEDIUM', 'HIGH'. Lower thresholds catch more threats at the cost of more false positives. Ignored if var.dns_firewall_advanced_enabled is false."
+  type        = string
+  default     = "HIGH"
+  validation {
+    condition     = contains(["LOW", "MEDIUM", "HIGH"], var.dns_firewall_advanced_confidence_threshold)
+    error_message = "dns_firewall_advanced_confidence_threshold must be one of: LOW, MEDIUM, HIGH."
+  }
+}
+
+variable "dns_firewall_priority" {
+  description = "Processing priority for this module's DNS Firewall rule group association within the VPC (lower is processed first). Must be unique among all rule group associations on the same VPC, including ones created outside this module. Ignored if var.dns_firewall_enabled is false."
+  type        = number
+  default     = 101
+}
+
 variable "tags" {
   description = "Additional tags to apply to created resources. Security Hub: most tagging controls (EC2.37/39/40/41/42/43/44/46/174) always pass regardless of this value since a Name tag is always merged in; EC2.48 (VPC flow logs should be tagged) and IAM.24 (IAM roles should be tagged, for the flow log role) apply this value directly with no fallback — default null fails both; set tags to pass."
   type        = map(string)

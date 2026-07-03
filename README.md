@@ -35,6 +35,7 @@ This module provides a complete AWS VPC networking solution designed for secure,
 - ✅ **Private Subnets** - Isolated application layer
 - ✅ **Network ACLs** - Subnet-level filtering
 - ✅ **Route Tables** - Controlled traffic routing
+- ✅ **DNS Firewall** - Optional Route 53 Resolver DNS Firewall with AWS managed threat lists and Advanced (DGA/DNS tunneling) detection
 
 ### Flexibility
 - ✅ **Configurable CIDR** - Custom IP ranges
@@ -235,6 +236,21 @@ vpc_flow_log_retention_days = 365
 
 **Cost:** ~$0.50/GB ingested + storage
 
+## Route53 DNS Firewall
+
+Optional Route 53 Resolver DNS Firewall rule group, associated with this module's dedicated VPC. Not available when using external subnets (`subnets_ids`).
+
+```hcl
+dns_firewall_enabled          = true
+dns_firewall_advanced_enabled = true # optional, extra option
+```
+
+- **AWS managed rules (default)** — blocks/alerts on DNS queries matching the [AWS Managed](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-managed-domain-lists.html) Aggregate Threat List (malware, ransomware, botnet, spyware, DNS tunneling). AWS Managed Domain List IDs are region-specific and can't be looked up from within Terraform, so this module ships a built-in ID for each commercial region enabled by default — no configuration needed. For a region requiring opt-in, look your ID up once and pass it via `dns_firewall_managed_domain_list_ids`:
+  ```sh
+  aws route53resolver list-firewall-domain-lists --query "FirewallDomainLists[?ManagedOwnerName=='Route 53 Resolver DNS Firewall']"
+  ```
+- **DNS Firewall Advanced (extra option)** — set `dns_firewall_advanced_enabled = true` to add rules detecting domain generation algorithm (DGA) and DNS tunneling activity via machine learning, on top of the managed-list rules. Needs no domain list ID.
+
 ## IPv6 Support
 
 Dual-stack networking is always enabled — no variable needed. The module automatically assigns:
@@ -287,6 +303,8 @@ Severity: 🔴 Critical · 🟠 High · 🟡 Medium · 🔵 Low
 | CloudWatch.16 | 🟡 Medium | CloudWatch log groups should be retained for a specified time period (AWS default: ≥365 days) | ⚠️ Conditional (default: ✅ Pass) | Keep `vpc_flow_log_retention_days` at `365` or more (default `365`) to pass. Lowering it fails the control's 365-day default threshold. |
 
 Not mapped to a specific control, but recommended whenever [GuardDuty Runtime Monitoring](https://docs.aws.amazon.com/guardduty/latest/ug/how-does-runtime-monitoring-work.html) is used on resources in this VPC: set `guardduty_vpc_endpoint_enabled = true` (default `false`) to add the `guardduty-data` interface endpoint in this module's own subnets, enforced regardless of `internet_access_allowed`/`nat_gateways_allowed` (same as the compliance endpoints above). This is more reliable than GuardDuty's automated agent configuration, which creates its own endpoint but doesn't guarantee it lands in the right subnets and can fail to provision — enabling this variable takes priority over that automatic creation. Not possible in the public-subnet architecture (`internet_access_allowed = true` with `nat_gateways_allowed = false`) — no private subnet exists there to host it.
+
+Not mapped to a specific control, but recommended as an additional layer of defense: set `dns_firewall_enabled = true` (default `false`) to associate a Route 53 Resolver DNS Firewall rule group with this module's dedicated VPC, blocking DNS queries to domains on an AWS Managed Domain List (via `dns_firewall_managed_domain_list_ids`). Set `dns_firewall_advanced_enabled = true` on top to add DGA and DNS tunneling detection. Only available for the VPC this module creates — not supported with externally-supplied `subnets_ids`.
 
 ---
 
@@ -357,6 +375,10 @@ Not mapped to a specific control, but recommended whenever [GuardDuty Runtime Mo
 | [aws_route.netdev_nat_to_web_ipv4](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
 | [aws_route.public_to_internet_ipv4](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
 | [aws_route.public_to_internet_ipv6](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route) | resource |
+| [aws_route53_resolver_firewall_rule.dns_firewall_advanced](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_resolver_firewall_rule) | resource |
+| [aws_route53_resolver_firewall_rule.dns_firewall_managed](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_resolver_firewall_rule) | resource |
+| [aws_route53_resolver_firewall_rule_group.dns_firewall](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_resolver_firewall_rule_group) | resource |
+| [aws_route53_resolver_firewall_rule_group_association.dns_firewall](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_resolver_firewall_rule_group_association) | resource |
 | [aws_route_table.app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
 | [aws_route_table.netdev](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
 | [aws_route_table.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table) | resource |
@@ -389,6 +411,12 @@ Not mapped to a specific control, but recommended whenever [GuardDuty Runtime Mo
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_availability_zones_count"></a> [availability\_zones\_count](#input\_availability\_zones\_count) | Maximum count of availability zones to provision with the dedicated VPC. Default to all available availability zones. | `number` | `null` | no |
 | <a name="input_compliance_vpc_endpoints_enabled"></a> [compliance\_vpc\_endpoints\_enabled](#input\_compliance\_vpc\_endpoints\_enabled) | If true, add the interface VPC endpoints for ECR API ('ecr.api'), ECR Docker Registry ('ecr.dkr'), Systems Manager ('ssm'), SSM Incident Manager Contacts ('ssm-contacts') and SSM Incident Manager ('ssm-incidents'), on top of any explicitly listed services in var.vpc\_endpoints\_services. Enable only if you have high compliance requirements — each interface endpoint adds cost. Enforced whenever a netdev (private) subnet exists, regardless of var.internet\_access\_allowed/var.nat\_gateways\_allowed; not possible in the public-subnet architecture (var.internet\_access\_allowed=true with var.nat\_gateways\_allowed=false), which has no private subnet to host the endpoints. Ignored if var.vpc\_endpoints\_allowed is false. Security Hub: EC2.55/EC2.56/EC2.57/EC2.58/EC2.60 — default false = fail; set to true to pass. | `bool` | `false` | no |
+| <a name="input_dns_firewall_action"></a> [dns\_firewall\_action](#input\_dns\_firewall\_action) | Action taken by DNS Firewall when a query matches a domain from var.dns\_firewall\_managed\_domain\_list\_ids, and (if var.dns\_firewall\_advanced\_enabled) a DNS Firewall Advanced threat detection. Valid values: 'ALLOW', 'BLOCK', 'ALERT'. 'ALLOW' isn't valid for DNS Firewall Advanced rules, so it's treated as 'BLOCK' for those only. Ignored if var.dns\_firewall\_enabled is false. | `string` | `"BLOCK"` | no |
+| <a name="input_dns_firewall_advanced_confidence_threshold"></a> [dns\_firewall\_advanced\_confidence\_threshold](#input\_dns\_firewall\_advanced\_confidence\_threshold) | Confidence threshold for DNS Firewall Advanced rules. Valid values: 'LOW', 'MEDIUM', 'HIGH'. Lower thresholds catch more threats at the cost of more false positives. Ignored if var.dns\_firewall\_advanced\_enabled is false. | `string` | `"HIGH"` | no |
+| <a name="input_dns_firewall_advanced_enabled"></a> [dns\_firewall\_advanced\_enabled](#input\_dns\_firewall\_advanced\_enabled) | If true, add Route 53 Resolver DNS Firewall Advanced rules blocking DNS queries identified as domain generation algorithm (DGA) or DNS tunneling activity, on top of any managed-domain-list rules. Ignored if var.dns\_firewall\_enabled is false. | `bool` | `false` | no |
+| <a name="input_dns_firewall_enabled"></a> [dns\_firewall\_enabled](#input\_dns\_firewall\_enabled) | If true, create a Route 53 Resolver DNS Firewall rule group and associate it with this module's dedicated VPC, blocking/alerting on DNS queries per var.dns\_firewall\_managed\_domain\_lists and var.dns\_firewall\_advanced\_enabled. Only supported for the VPC this module creates; cannot be enabled when using external subnets (subnets\_ids). Not mapped to a Security Hub control; default false = feature not created. | `bool` | `false` | no |
+| <a name="input_dns_firewall_managed_domain_list_ids"></a> [dns\_firewall\_managed\_domain\_list\_ids](#input\_dns\_firewall\_managed\_domain\_list\_ids) | Map of AWS Managed Domain List name to ID (e.g. { "AWSManagedDomainsAggregateThreatList" = "rslvr-fdl-..." }) to block/alert on via var.dns\_firewall\_action. Defaults (null) to this module's built-in Aggregate Threat List ID for the current region (see local.dns\_firewall\_default\_managed\_domain\_list\_ids in dns\_firewall.tf), covering commercial regions enabled by default. IDs are region-specific and can't be resolved from within Terraform, so for a region not in that table look yours up with: 'aws route53resolver list-firewall-domain-lists --query "FirewallDomainLists[?ManagedOwnerName=='Route 53 Resolver DNS Firewall']"'. Ignored if var.dns\_firewall\_enabled is false. Set to {} to skip managed-list rules while still using var.dns\_firewall\_advanced\_enabled. | `map(string)` | `null` | no |
+| <a name="input_dns_firewall_priority"></a> [dns\_firewall\_priority](#input\_dns\_firewall\_priority) | Processing priority for this module's DNS Firewall rule group association within the VPC (lower is processed first). Must be unique among all rule group associations on the same VPC, including ones created outside this module. Ignored if var.dns\_firewall\_enabled is false. | `number` | `101` | no |
 | <a name="input_guardduty_vpc_endpoint_enabled"></a> [guardduty\_vpc\_endpoint\_enabled](#input\_guardduty\_vpc\_endpoint\_enabled) | If true, add the 'guardduty-data' interface VPC endpoint. Only relevant if you use GuardDuty Runtime Monitoring on resources in this VPC — leave false otherwise. Recommended whenever Runtime Monitoring is enabled, even with GuardDuty's automated agent configuration: letting GuardDuty create its own endpoint does not guarantee placement in this module's netdev subnets, and that automatic creation can fail; enabling this takes priority over GuardDuty's own creation and ensures it lands in the correct subnets. Enforced whenever a netdev (private) subnet exists, regardless of var.internet\_access\_allowed/var.nat\_gateways\_allowed — not possible in the public-subnet architecture (var.internet\_access\_allowed=true with var.nat\_gateways\_allowed=false), which has no private subnet to host it. Ignored if var.vpc\_endpoints\_allowed is false. Not mapped to a Security Hub control; default false = endpoint not created. | `bool` | `false` | no |
 | <a name="input_internet_access_allowed"></a> [internet\_access\_allowed](#input\_internet\_access\_allowed) | If true, allow internet access. Security Hub: default false = pass for EC2.15 (subnets should not automatically assign public IP addresses); combining true here with var.nat\_gateways\_allowed = false fails EC2.15 by making app subnets public. | `bool` | `false` | no |
 | <a name="input_kms_key_id"></a> [kms\_key\_id](#input\_kms\_key\_id) | If specified, directly use this KMS key instead of creating a dedicated one for the application. | `string` | `null` | no |
@@ -411,6 +439,7 @@ Not mapped to a specific control, but recommended whenever [GuardDuty Runtime Mo
 
 | Name | Description |
 | ---- | ----------- |
+| <a name="output_dns_firewall_rule_group_id"></a> [dns\_firewall\_rule\_group\_id](#output\_dns\_firewall\_rule\_group\_id) | Route 53 Resolver DNS Firewall rule group ID. Null if var.dns\_firewall\_enabled is false. |
 | <a name="output_ipv6_enabled"></a> [ipv6\_enabled](#output\_ipv6\_enabled) | Whether IPv6 is enabled on the VPC. |
 | <a name="output_kms_key_arn"></a> [kms\_key\_arn](#output\_kms\_key\_arn) | KMS key ARN. |
 | <a name="output_kms_key_id"></a> [kms\_key\_id](#output\_kms\_key\_id) | KMS key ID. |
