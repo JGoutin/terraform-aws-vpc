@@ -403,6 +403,7 @@ Not mapped to a specific control, but recommended as an additional layer of defe
 | [aws_iam_policy_document.vpc_flow_log_kms_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 | [aws_subnet.app](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnet) | data source |
+| [aws_subnet.provided](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnet) | data source |
 | [aws_vpc_endpoint_service.netdev_vpce_interface](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/vpc_endpoint_service) | data source |
 
 ## Inputs
@@ -445,8 +446,12 @@ Not mapped to a specific control, but recommended as an additional layer of defe
 | <a name="output_kms_key_id"></a> [kms\_key\_id](#output\_kms\_key\_id) | KMS key ID. |
 | <a name="output_kms_policy_dependency"></a> [kms\_policy\_dependency](#output\_kms\_policy\_dependency) | To use with 'depends\_on' for resources requiring that KMS policy is updated before creation. Only if var.kms\_key\_id is set. |
 | <a name="output_kms_policy_documents_json"></a> [kms\_policy\_documents\_json](#output\_kms\_policy\_documents\_json) | KMS policy documents to add to the policy of the key specified via var.kms\_key\_id. |
+| <a name="output_public_subnets_cidr_blocks"></a> [public\_subnets\_cidr\_blocks](#output\_public\_subnets\_cidr\_blocks) | Public subnets IPv4 CIDR blocks. Empty list if public subnets are not enabled. |
 | <a name="output_public_subnets_ids"></a> [public\_subnets\_ids](#output\_public\_subnets\_ids) | Public subnets IDs. Empty list if public subnets are not enabled. |
+| <a name="output_public_subnets_ipv6_cidr_blocks"></a> [public\_subnets\_ipv6\_cidr\_blocks](#output\_public\_subnets\_ipv6\_cidr\_blocks) | Public subnets IPv6 CIDR blocks. Empty list if public subnets are not enabled. |
 | <a name="output_security_group_id"></a> [security\_group\_id](#output\_security\_group\_id) | Security groups ID. |
+| <a name="output_subnets_cidr_blocks"></a> [subnets\_cidr\_blocks](#output\_subnets\_cidr\_blocks) | App subnets IPv4 CIDR blocks. |
 | <a name="output_subnets_ids"></a> [subnets\_ids](#output\_subnets\_ids) | Subnets ID. |
+| <a name="output_subnets_ipv6_cidr_blocks"></a> [subnets\_ipv6\_cidr\_blocks](#output\_subnets\_ipv6\_cidr\_blocks) | App subnets IPv6 CIDR blocks. Empty list if IPv6 is not assigned. |
 | <a name="output_vpc_id"></a> [vpc\_id](#output\_vpc\_id) | VPC ID. |
 <!-- END_TF_DOCS -->

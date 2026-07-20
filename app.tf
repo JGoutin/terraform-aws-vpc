@@ -257,3 +257,9 @@ data "aws_subnet" "app" {
   count = local.vpc_enabled ? 0 : 1
   id    = var.subnets_ids[0]
 }
+
+# All externally-provided subnets, looked up to expose their CIDR blocks.
+data "aws_subnet" "provided" {
+  for_each = local.vpc_enabled ? toset([]) : toset(var.subnets_ids)
+  id       = each.key
+}

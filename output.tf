@@ -43,6 +43,34 @@ output "public_subnets_ids" {
   value       = local.public_subnets_enabled ? [for az in local.vpc_availability_zones : aws_subnet.public[az].id] : []
 }
 
+output "subnets_cidr_blocks" {
+  description = "App subnets IPv4 CIDR blocks."
+  value = local.vpc_enabled ? [
+    for az in local.vpc_availability_zones : aws_subnet.app[az].cidr_block
+    ] : [
+    for s in data.aws_subnet.provided : s.cidr_block
+  ]
+}
+
+output "subnets_ipv6_cidr_blocks" {
+  description = "App subnets IPv6 CIDR blocks. Empty list if IPv6 is not assigned."
+  value = local.vpc_enabled ? [
+    for az in local.vpc_availability_zones : aws_subnet.app[az].ipv6_cidr_block
+    ] : [
+    for s in data.aws_subnet.provided : s.ipv6_cidr_block if s.ipv6_cidr_block != ""
+  ]
+}
+
+output "public_subnets_cidr_blocks" {
+  description = "Public subnets IPv4 CIDR blocks. Empty list if public subnets are not enabled."
+  value       = local.public_subnets_enabled ? [for az in local.vpc_availability_zones : aws_subnet.public[az].cidr_block] : []
+}
+
+output "public_subnets_ipv6_cidr_blocks" {
+  description = "Public subnets IPv6 CIDR blocks. Empty list if public subnets are not enabled."
+  value       = local.public_subnets_enabled ? [for az in local.vpc_availability_zones : aws_subnet.public[az].ipv6_cidr_block] : []
+}
+
 output "dns_firewall_rule_group_id" {
   description = "Route 53 Resolver DNS Firewall rule group ID. Null if var.dns_firewall_enabled is false."
   value       = local.dns_firewall_enabled ? aws_route53_resolver_firewall_rule_group.dns_firewall[0].id : null
