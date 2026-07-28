@@ -1,6 +1,6 @@
 output "vpc_id" {
   description = "VPC ID."
-  value       = local.vpc_id
+  value       = coalesce(local.vpc_id)
 }
 
 output "subnets_ids" {
@@ -10,7 +10,7 @@ output "subnets_ids" {
 
 output "security_group_id" {
   description = "Security groups ID."
-  value       = local.security_group_id
+  value       = coalesce(local.security_group_id)
 }
 
 output "kms_policy_documents_json" {
