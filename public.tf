@@ -176,8 +176,13 @@ resource "aws_subnet" "public" {
   cidr_block                      = module.public_ipv4_cidr[0].network_cidr_blocks[each.key]
   ipv6_cidr_block                 = module.public_ipv6_cidr[0].network_cidr_blocks[each.key]
   assign_ipv6_address_on_creation = true
-  map_public_ip_on_launch         = true
-  tags                            = merge(local.tags, { Name = "${var.name_prefix}-public-sn-${each.key}" })
+  # Nothing placed here needs the subnet to hand out an address: a load
+  # balancer's interfaces are addressed by ELB, a NAT gateway by its own EIP,
+  # and a task by "assign_public_ip" on its network configuration. Leaving it
+  # on would give every future interface a public address by default, which
+  # EC2.15 fails the subnet for.
+  map_public_ip_on_launch = false
+  tags                    = merge(local.tags, { Name = "${var.name_prefix}-public-sn-${each.key}" })
 }
 
 resource "aws_route_table" "public" {

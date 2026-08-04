@@ -175,8 +175,11 @@ resource "aws_subnet" "app" {
   cidr_block                      = module.app_ipv4_cidr[0].network_cidr_blocks[each.key]
   ipv6_cidr_block                 = module.app_ipv6_cidr[0].network_cidr_blocks[each.key]
   assign_ipv6_address_on_creation = true
-  map_public_ip_on_launch         = local.public_subnet_enabled
-  tags                            = merge(local.tags, { Name = "${var.name_prefix}-app-sn-${each.key}" })
+  # Public in the no-NAT architecture, but still not handing out addresses:
+  # what runs here is an ECS task, which takes its public address from
+  # "assign_public_ip" on its own network configuration. See the public subnet.
+  map_public_ip_on_launch = false
+  tags                    = merge(local.tags, { Name = "${var.name_prefix}-app-sn-${each.key}" })
 }
 
 resource "aws_route_table" "app" {

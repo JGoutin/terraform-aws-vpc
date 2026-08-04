@@ -291,8 +291,8 @@ Severity: 🔴 Critical · 🟠 High · 🟡 Medium · 🔵 Low
 |---|---|---|---|---|
 | EC2.2 (CIS 5.4) | 🟠 High | VPC default security groups should restrict all traffic | ✅ Pass | `aws_default_security_group` is managed with no ingress/egress blocks, which revokes all default rules. Not configurable; always applied when the module creates the VPC. |
 | EC2.6 (CIS 3.9) | 🟡 Medium | VPC flow logging should be enabled in all VPCs | ⚠️ Conditional (default: ✅ Pass) | Keep `vpc_flow_log_enabled = true` (default) to pass. Setting it to `false` fails the control. |
-| EC2.15 | 🟡 Medium | EC2 subnets should not automatically assign public IP addresses | ⚠️ Conditional (default: ✅ Pass) | Keep `public_subnets_enabled = false` (default) to pass. Combining `internet_access_allowed = true` with `nat_gateways_allowed = false` fails the control — it makes the **app** subnets public too. |
-| EC2.21 (CIS 5.1/5.2) | 🟡 Medium | Network ACLs should not allow ingress from 0.0.0.0/0 to remote administration ports (22, 3389) | ⚠️ Conditional (default: ✅ Pass) | Keep `public_ingress_ports` / `public_to_app_ports` at their defaults (443 / 8000) to pass. Adding an entry with `from_port`/`to_port` covering 22 or 3389 fails the control. |
+| EC2.15 | 🟡 Medium | EC2 subnets should not automatically assign public IP addresses | ✅ Pass | No subnet assigns addresses on launch, public ones included: a load balancer's interfaces are addressed by ELB, a NAT gateway by its own EIP, and an ECS task by `assign_public_ip` on its network configuration. Not configurable. An instance launched here by hand gets no public address unless it asks for one. |
+| EC2.21 (CIS 5.1/5.2) | 🟡 Medium | Network ACLs should not allow ingress from 0.0.0.0/0 to remote administration ports (22, 3389) | ❌ Fail (accepted) | See [Why EC2.21 fails](#why-ec221-fails) below. Adding a `public_ingress_ports` / `public_to_app_ports` entry covering 22 or 3389 would fail it for a second, real reason — the defaults (443 / 8000) do not. |
 | EC2.53 / EC2.54 | 🟠 High | Security groups should not allow ingress from 0.0.0.0/0 (IPv4/IPv6) to remote administration ports | ✅ Pass | The module's own security groups never open ingress to 0.0.0.0/0 or ::/0. No option needed; keep any additional security groups attached via `security_group_id` similarly restricted. |
 | EC2.13 / EC2.14 | 🟠 High | Security groups should not allow ingress from 0.0.0.0/0 or ::/0 to port 22 / port 3389 | ✅ Pass | Same reasoning as EC2.53/54 — the module's security groups never open port 22 or 3389 to the internet. |
 | EC2.12 | 🔵 Low | Unused Amazon EC2 EIPs should be removed | ✅ Pass | The NAT gateway EIP (`aws_eip.netdev_nat`) is always attached to a NAT gateway; never left unused. |
@@ -301,6 +301,16 @@ Severity: 🔴 Critical · 🟠 High · 🟡 Medium · 🔵 Low
 | IAM.24 | 🔵 Low | IAM roles should be tagged | ⚠️ Conditional (default: ❌ Fail) | Set `tags` to pass. The VPC flow log IAM role (`aws_iam_role.vpc_flow_log`) applies `var.tags` as-is (default `null`), so it ships untagged unless you supply tags. |
 | EC2.55 / EC2.56 / EC2.57 / EC2.58 / EC2.60 | 🟡 Medium | VPCs should be configured with an interface endpoint for ECR API / Docker Registry / Systems Manager / SSM Incident Manager Contacts / SSM Incident Manager | ⚠️ Conditional (default: ❌ Fail) | Set `compliance_vpc_endpoints_enabled = true` (default `false`) with `vpc_endpoints_allowed = true` (default) to pass — together they add the `ecr.api`, `ecr.dkr`, `ssm`, `ssm-contacts` and `ssm-incidents` interface endpoints, enforced regardless of `internet_access_allowed`/`nat_gateways_allowed`. This is opt-in due to the added per-endpoint cost; leave disabled unless these controls are required. Not achievable in the public-subnet architecture (`internet_access_allowed = true` with `nat_gateways_allowed = false`) — no private subnet exists there to host the endpoints. |
 | CloudWatch.16 | 🟡 Medium | CloudWatch log groups should be retained for a specified time period (AWS default: ≥365 days) | ⚠️ Conditional (default: ✅ Pass) | Keep `vpc_flow_log_retention_days` at `365` or more (default `365`) to pass. Lowering it fails the control's 365-day default threshold. |
+
+### Why EC2.21 fails
+
+Network ACLs are stateless, so each one allows `0.0.0.0/0` over the ephemeral
+range `1024-65535` for return traffic. 3389 falls inside it; 22 does not.
+
+Nothing is reachable there: the security groups in front admit no ingress from
+`0.0.0.0/0` (EC2.13/14/53/54 above), and they are stateful. Excluding 3389 from
+the range would silence the finding and drop any reply landing on that local
+port — a real failure traded for an unreachable one.
 
 Not mapped to a specific control, but recommended whenever [GuardDuty Runtime Monitoring](https://docs.aws.amazon.com/guardduty/latest/ug/how-does-runtime-monitoring-work.html) is used on resources in this VPC: set `guardduty_vpc_endpoint_enabled = true` (default `false`) to add the `guardduty-data` interface endpoint in this module's own subnets, enforced regardless of `internet_access_allowed`/`nat_gateways_allowed` (same as the compliance endpoints above). This is more reliable than GuardDuty's automated agent configuration, which creates its own endpoint but doesn't guarantee it lands in the right subnets and can fail to provision — enabling this variable takes priority over that automatic creation. Not possible in the public-subnet architecture (`internet_access_allowed = true` with `nat_gateways_allowed = false`) — no private subnet exists there to host it.
 
