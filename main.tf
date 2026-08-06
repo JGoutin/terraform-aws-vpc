@@ -7,6 +7,12 @@ locals {
   vpc_enabled        = length(var.subnets_ids) == 0
   vpc_resource_count = local.vpc_enabled ? 1 : 0
 
+  # A VPC this module creates always receives an IPv6 block, so its own configuration
+  # answers; provided subnets are whatever the caller built, so they have to be asked.
+  # Reported from the first one, matching how a consumer picks the subnet that decides
+  # a dual-stack behavior, rather than requiring every subnet to agree.
+  ipv6_enabled = local.vpc_enabled || try(data.aws_subnet.app[0].ipv6_cidr_block, null) != null
+
   # Tags to merge into resources that already carry a Name tag
   tags = coalesce(var.tags, {})
   vpc_availability_zones = toset(

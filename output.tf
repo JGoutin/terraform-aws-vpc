@@ -34,8 +34,8 @@ output "kms_key_arn" {
 }
 
 output "ipv6_enabled" {
-  description = "Whether IPv6 is enabled on the VPC."
-  value       = local.vpc_enabled
+  description = "Whether the subnets the workload runs in carry IPv6. Always true for a VPC this module creates; read from the first provided subnet otherwise."
+  value       = local.ipv6_enabled
 }
 
 output "public_subnets_ids" {
