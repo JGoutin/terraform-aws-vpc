@@ -126,6 +126,26 @@ variable "public_ingress_ports" {
   }
 }
 
+variable "internet_to_app_ports" {
+  description = "Map of ports the internet can open on app servers in app subnets, on top of the replies to the requests they make themselves. Each entry must specify from_port. Optional: to_port (defaults to from_port), protocol (defaults to 'tcp'). Network ACLs are stateless, so each entry also opens the ephemeral range 1024-65535 in egress for the same protocol, which is where the reply goes. Applied to both 0.0.0.0/0 and ::/0, and only where an internet path exists (var.internet_access_allowed), like the module's own internet rules: a narrower source belongs to the security group in front, and a network ACL wider than that security group grants nothing. Traffic only actually arrives where the app subnets are public (var.nat_gateways_allowed = false) and the workload takes a public address. Security Hub: EC2.21 (Network ACLs should not allow ingress from 0.0.0.0/0 to port 22 or port 3389) — default (empty) = pass; adding an entry with from_port/to_port covering 22 or 3389 fails it."
+  type = map(object({
+    from_port = number
+    to_port   = optional(number)
+    protocol  = optional(string, "tcp")
+  }))
+  default = {}
+}
+
+variable "app_to_internet_ports" {
+  description = "Map of ports app servers in app subnets can open on the internet, on top of the TCP 443 already opened. Each entry must specify from_port. Optional: to_port (defaults to from_port), protocol (defaults to 'tcp'). Network ACLs are stateless, so each entry also opens the ephemeral range 1024-65535 in ingress for the same protocol, which is where the reply comes back. Applied to both 0.0.0.0/0 and ::/0, and only where an internet path exists (var.internet_access_allowed), like the module's own internet rules: a narrower destination belongs to the security group in front, and a network ACL wider than that security group grants nothing. Security Hub: EC2.21 (Network ACLs should not allow ingress from 0.0.0.0/0 to port 22 or port 3389) — default (empty) = pass, and no entry can fail it since the only ingress it adds is the ephemeral range the module already opens; the egress rule still widens what the app tier may reach, so list only the ports the workload calls out on."
+  type = map(object({
+    from_port = number
+    to_port   = optional(number)
+    protocol  = optional(string, "tcp")
+  }))
+  default = {}
+}
+
 variable "dns_firewall_enabled" {
   description = "If true, create a Route 53 Resolver DNS Firewall rule group and associate it with this module's dedicated VPC, blocking/alerting on DNS queries per var.dns_firewall_managed_domain_lists and var.dns_firewall_advanced_enabled. Only supported for the VPC this module creates; cannot be enabled when using external subnets (subnets_ids). Not mapped to a Security Hub control; default false = feature not created."
   type        = bool

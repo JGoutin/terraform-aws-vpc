@@ -96,8 +96,34 @@ locals {
     }
   ] : []
 
+  # NACL rules for app subnets - extra internet flows requested by the caller
+  # A network ACL is stateless: each requested flow also opens its reply direction on the
+  # ephemeral range, which is where the other end answers.
+  app_nacl_rules_internet_ipv4_ingress = local.internet_required ? concat(
+    [for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
+    [for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+  ) : []
+
+  app_nacl_rules_internet_ipv4_egress = local.internet_required ? concat(
+    [for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+    [for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
+  ) : []
+
+  app_nacl_rules_internet_ipv6_ingress = local.internet_required ? concat(
+    [for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
+    [for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+  ) : []
+
+  app_nacl_rules_internet_ipv6_egress = local.internet_required ? concat(
+    [for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+    [for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
+  ) : []
+
   # NACL rules
   # netdev and internet access are independent, not exclusive: both rules are added whenever needed.
+  # Caller-requested flows come last: rule numbers are index-based (401 for IPv4, 601 for IPv6),
+  # so appending leaves every existing number untouched, and IPv4 keeps 200 free slots below the
+  # IPv6 base - far more than the number of rules a network ACL accepts.
   app_nacl_rules_ipv4_ingress = concat(
     local.app_nacl_rules_intra_ipv4,
     local.vpce_interfaces_enabled ? [
@@ -108,7 +134,8 @@ locals {
       # Allow responses from internet
       { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
     ] : [],
-    local.app_nacl_rules_from_public_ipv4
+    local.app_nacl_rules_from_public_ipv4,
+    local.app_nacl_rules_internet_ipv4_ingress
   )
   app_nacl_rules_ipv4_egress = concat(
     local.app_nacl_rules_intra_ipv4,
@@ -120,7 +147,8 @@ locals {
       # Allow requests to internet
       { cidr_block = "0.0.0.0/0", from_port = 443, to_port = 443, protocol = "tcp" }
     ] : [],
-    local.app_nacl_rules_to_public_ipv4
+    local.app_nacl_rules_to_public_ipv4,
+    local.app_nacl_rules_internet_ipv4_egress
   )
   app_nacl_rules_ipv6_ingress = concat(
     local.app_nacl_rules_intra_ipv6,
@@ -132,7 +160,8 @@ locals {
       # Allow responses from internet (direct or via NAT Gateway)
       { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = "tcp" },
     ] : [],
-    local.app_nacl_rules_from_public_ipv6
+    local.app_nacl_rules_from_public_ipv6,
+    local.app_nacl_rules_internet_ipv6_ingress
   )
   app_nacl_rules_ipv6_egress = concat(
     local.app_nacl_rules_intra_ipv6,
@@ -144,7 +173,8 @@ locals {
       # Allow requests to internet (direct or via NAT Gateway)
       { cidr_block = "::/0", from_port = 443, to_port = 443, protocol = "tcp" },
     ] : [],
-    local.app_nacl_rules_to_public_ipv6
+    local.app_nacl_rules_to_public_ipv6,
+    local.app_nacl_rules_internet_ipv6_egress
   )
 }
 
