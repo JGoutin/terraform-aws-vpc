@@ -98,24 +98,26 @@ locals {
 
   # NACL rules for app subnets - extra internet flows requested by the caller
   # A network ACL is stateless: each requested flow also opens its reply direction on the
-  # ephemeral range, which is where the other end answers.
+  # ephemeral range, which is where the other end answers. That reply rule only depends on the
+  # protocol, so entries sharing one would emit the same rule twice: distinct keeps a single copy
+  # and spares the 20-rules-per-direction quota.
   app_nacl_rules_internet_ipv4_ingress = local.internet_required ? concat(
     [for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
-    [for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+    distinct([for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
   ) : []
 
   app_nacl_rules_internet_ipv4_egress = local.internet_required ? concat(
-    [for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+    distinct([for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
     [for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
   ) : []
 
   app_nacl_rules_internet_ipv6_ingress = local.internet_required ? concat(
     [for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
-    [for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+    distinct([for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
   ) : []
 
   app_nacl_rules_internet_ipv6_egress = local.internet_required ? concat(
-    [for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }],
+    distinct([for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
     [for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
   ) : []
 

@@ -127,23 +127,45 @@ variable "public_ingress_ports" {
 }
 
 variable "internet_to_app_ports" {
-  description = "Map of ports the internet can open on app servers in app subnets, on top of the replies to the requests they make themselves. Each entry must specify from_port. Optional: to_port (defaults to from_port), protocol (defaults to 'tcp'). Network ACLs are stateless, so each entry also opens the ephemeral range 1024-65535 in egress for the same protocol, which is where the reply goes. Applied to both 0.0.0.0/0 and ::/0, and only where an internet path exists (var.internet_access_allowed), like the module's own internet rules: a narrower source belongs to the security group in front, and a network ACL wider than that security group grants nothing. Traffic only actually arrives where the app subnets are public (var.nat_gateways_allowed = false) and the workload takes a public address. Security Hub: EC2.21 (Network ACLs should not allow ingress from 0.0.0.0/0 to port 22 or port 3389) — default (empty) = pass; adding an entry with from_port/to_port covering 22 or 3389 fails it."
+  description = "Map of ports the internet can open on app servers in app subnets, on top of the replies to the requests they make themselves. Each entry must specify from_port. Optional: to_port (defaults to from_port), protocol (defaults to 'tcp'). Network ACLs are stateless, so each entry also opens the ephemeral range 1024-65535 in egress for the same protocol, which is where the reply goes. Applied to both 0.0.0.0/0 and ::/0, and only where the module provisions an internet path: var.internet_access_allowed = true, or interface endpoints required by var.vpc_endpoints_services while var.vpc_endpoints_allowed = false. Like the module's own internet rules, a narrower source belongs to the security group in front, and a network ACL wider than that security group grants nothing. Traffic only actually arrives over IPv4 where the app subnets are public (var.nat_gateways_allowed = false) and the workload takes a public address; over IPv6 the app subnets egress through an egress-only internet gateway, which admits no externally initiated connection. Cannot be used with external subnets (subnets_ids). Security Hub: EC2.21 (Network ACLs should not allow ingress from 0.0.0.0/0 to port 22 or port 3389) — default (empty) = pass; adding an entry with from_port/to_port covering 22 or 3389 fails it."
   type = map(object({
     from_port = number
     to_port   = optional(number)
     protocol  = optional(string, "tcp")
   }))
   default = {}
+  validation {
+    condition     = length(var.internet_to_app_ports) == 0 || length(var.subnets_ids) == 0
+    error_message = "internet_to_app_ports cannot be used with external subnets (subnets_ids). The application network ACL it adds rules to is only created when provisioning a dedicated VPC."
+  }
+  validation {
+    condition = alltrue([
+      for entry in values(var.internet_to_app_ports) :
+      entry.from_port >= 0 && coalesce(entry.to_port, entry.from_port) >= entry.from_port && coalesce(entry.to_port, entry.from_port) <= 65535
+    ])
+    error_message = "internet_to_app_ports entries must have 0 <= from_port <= to_port <= 65535, to_port defaulting to from_port."
+  }
 }
 
 variable "app_to_internet_ports" {
-  description = "Map of ports app servers in app subnets can open on the internet, on top of the TCP 443 already opened. Each entry must specify from_port. Optional: to_port (defaults to from_port), protocol (defaults to 'tcp'). Network ACLs are stateless, so each entry also opens the ephemeral range 1024-65535 in ingress for the same protocol, which is where the reply comes back. Applied to both 0.0.0.0/0 and ::/0, and only where an internet path exists (var.internet_access_allowed), like the module's own internet rules: a narrower destination belongs to the security group in front, and a network ACL wider than that security group grants nothing. Security Hub: EC2.21 (Network ACLs should not allow ingress from 0.0.0.0/0 to port 22 or port 3389) — default (empty) = pass, and no entry can fail it since the only ingress it adds is the ephemeral range the module already opens; the egress rule still widens what the app tier may reach, so list only the ports the workload calls out on."
+  description = "Map of ports app servers in app subnets can open on the internet, on top of the TCP 443 already opened. Each entry must specify from_port. Optional: to_port (defaults to from_port), protocol (defaults to 'tcp'). Network ACLs are stateless, so each entry also opens the ephemeral range 1024-65535 in ingress for the same protocol, which is where the reply comes back. The module already opens that range in ingress for TCP only, so an entry with another protocol genuinely opens it for that protocol: the module cannot know which local ports the workload binds, so the whole range is opened. Applied to both 0.0.0.0/0 and ::/0, and only where the module provisions an internet path: var.internet_access_allowed = true, or interface endpoints required by var.vpc_endpoints_services while var.vpc_endpoints_allowed = false. Like the module's own internet rules, a narrower destination belongs to the security group in front, and a network ACL wider than that security group grants nothing. Cannot be used with external subnets (subnets_ids). Security Hub: EC2.21 (Network ACLs should not allow ingress from 0.0.0.0/0 to port 22 or port 3389) — default (empty) = pass; the only ingress an entry adds is that ephemeral range in the entry's own protocol, so a 'tcp' entry adds nothing the module doesn't already open, and the egress rule still widens what the app tier may reach, so list only the ports and protocols the workload calls out on."
   type = map(object({
     from_port = number
     to_port   = optional(number)
     protocol  = optional(string, "tcp")
   }))
   default = {}
+  validation {
+    condition     = length(var.app_to_internet_ports) == 0 || length(var.subnets_ids) == 0
+    error_message = "app_to_internet_ports cannot be used with external subnets (subnets_ids). The application network ACL it adds rules to is only created when provisioning a dedicated VPC."
+  }
+  validation {
+    condition = alltrue([
+      for entry in values(var.app_to_internet_ports) :
+      entry.from_port >= 0 && coalesce(entry.to_port, entry.from_port) >= entry.from_port && coalesce(entry.to_port, entry.from_port) <= 65535
+    ])
+    error_message = "app_to_internet_ports entries must have 0 <= from_port <= to_port <= 65535, to_port defaulting to from_port."
+  }
 }
 
 variable "dns_firewall_enabled" {
