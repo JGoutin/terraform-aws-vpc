@@ -99,11 +99,18 @@ locals {
   # NACL rules for app subnets - extra internet flows requested by the caller
   # A network ACL is stateless: each requested flow also opens its reply direction on the
   # ephemeral range, which is where the other end answers. That reply rule only depends on the
-  # protocol, so entries sharing one would emit the same rule twice: distinct keeps a single copy
-  # and spares the 20-rules-per-direction quota.
+  # protocol, so entries sharing one would emit the same rule twice: distinct keeps a single copy.
+  # The module's own hard-coded TCP ephemeral ingress rule (below) is also excluded from that
+  # copy, so a "tcp" entry doesn't duplicate a rule the module already writes.
+  app_nacl_rule_internet_ephemeral_ipv4_tcp = { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
+  app_nacl_rule_internet_ephemeral_ipv6_tcp = { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
+
   app_nacl_rules_internet_ipv4_ingress = local.internet_required ? concat(
     [for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
-    distinct([for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
+    setsubtract(
+      distinct([for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
+      [local.app_nacl_rule_internet_ephemeral_ipv4_tcp],
+    ),
   ) : []
 
   app_nacl_rules_internet_ipv4_egress = local.internet_required ? concat(
@@ -113,7 +120,10 @@ locals {
 
   app_nacl_rules_internet_ipv6_ingress = local.internet_required ? concat(
     [for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
-    distinct([for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
+    setsubtract(
+      distinct([for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
+      [local.app_nacl_rule_internet_ephemeral_ipv6_tcp],
+    ),
   ) : []
 
   app_nacl_rules_internet_ipv6_egress = local.internet_required ? concat(
@@ -134,7 +144,7 @@ locals {
     ] : [],
     local.internet_required ? [
       # Allow responses from internet
-      { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
+      local.app_nacl_rule_internet_ephemeral_ipv4_tcp
     ] : [],
     local.app_nacl_rules_from_public_ipv4,
     local.app_nacl_rules_internet_ipv4_ingress
@@ -160,7 +170,7 @@ locals {
     ] : [],
     local.internet_required ? [
       # Allow responses from internet (direct or via NAT Gateway)
-      { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = "tcp" },
+      local.app_nacl_rule_internet_ephemeral_ipv6_tcp,
     ] : [],
     local.app_nacl_rules_from_public_ipv6,
     local.app_nacl_rules_internet_ipv6_ingress
@@ -230,6 +240,13 @@ resource "aws_network_acl" "app" {
   count  = local.vpc_enabled ? 1 : 0
   vpc_id = aws_vpc.vpc[0].id
   tags   = merge(local.tags, { Name = "${var.name_prefix}-app-nacl-${local.region}" })
+
+  lifecycle {
+    precondition {
+      condition     = local.internet_required || (length(var.internet_to_app_ports) == 0 && length(var.app_to_internet_ports) == 0)
+      error_message = "internet_to_app_ports and app_to_internet_ports are silently discarded without an internet path. Set var.internet_access_allowed = true, or require interface endpoints (a var.vpc_endpoints_services entry that isn't 's3'/'dynamodb') while var.vpc_endpoints_allowed = false."
+    }
+  }
 }
 
 resource "aws_network_acl_association" "app" {
