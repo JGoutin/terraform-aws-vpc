@@ -101,16 +101,17 @@ locals {
   # ephemeral range, which is where the other end answers. That reply rule only depends on the
   # protocol, so entries sharing one would emit the same rule twice: distinct keeps a single copy.
   # The module's own hard-coded TCP ephemeral ingress rule (below) is also excluded from that
-  # copy, so a "tcp" entry doesn't duplicate a rule the module already writes.
+  # copy, so a "tcp" entry doesn't duplicate a rule the module already writes. That exclusion is a
+  # filter rather than setsubtract, which returns a set concat refuses to take.
   app_nacl_rule_internet_ephemeral_ipv4_tcp = { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
   app_nacl_rule_internet_ephemeral_ipv6_tcp = { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = "tcp" }
 
   app_nacl_rules_internet_ipv4_ingress = local.internet_required ? concat(
     [for k, v in var.internet_to_app_ports : { cidr_block = "0.0.0.0/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
-    setsubtract(
-      distinct([for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
-      [local.app_nacl_rule_internet_ephemeral_ipv4_tcp],
-    ),
+    [
+      for rule in distinct([for k, v in var.app_to_internet_ports : { cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]) :
+      rule if rule != local.app_nacl_rule_internet_ephemeral_ipv4_tcp
+    ],
   ) : []
 
   app_nacl_rules_internet_ipv4_egress = local.internet_required ? concat(
@@ -120,10 +121,10 @@ locals {
 
   app_nacl_rules_internet_ipv6_ingress = local.internet_required ? concat(
     [for k, v in var.internet_to_app_ports : { cidr_block = "::/0", from_port = v.from_port, to_port = coalesce(v.to_port, v.from_port), protocol = v.protocol }],
-    setsubtract(
-      distinct([for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]),
-      [local.app_nacl_rule_internet_ephemeral_ipv6_tcp],
-    ),
+    [
+      for rule in distinct([for k, v in var.app_to_internet_ports : { cidr_block = "::/0", from_port = 1024, to_port = 65535, protocol = v.protocol }]) :
+      rule if rule != local.app_nacl_rule_internet_ephemeral_ipv6_tcp
+    ],
   ) : []
 
   app_nacl_rules_internet_ipv6_egress = local.internet_required ? concat(
