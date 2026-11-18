@@ -6,8 +6,4 @@ terraform {
       version = ">= 6.27.0"
     }
   }
-
-  provider_meta "aws" {
-    user_agent = ["APN_1.1/pc_72gxmztpjz2hm5qnkkg0iiazo$"]
-  }
 }
